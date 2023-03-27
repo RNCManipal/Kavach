@@ -13,6 +13,7 @@ from imutils.video import WebcamVideoStream,FPS
 # from camera import write
 
 torch.multiprocessing.set_start_method('spawn', force=True)
+prev_boxes = []
 
 ##  Setting up torch for gpu utilization
 if torch.cuda.is_available():
@@ -60,28 +61,32 @@ def write(bboxes, img, classes, colors):
     text_pt = (bboxes[0], bboxes[1] - 3)
     text_color = [255, 255, 255]
     
-    ## Distance Meaasurement for each bounding box
-    x, y, w, h = (bboxes[0]), (bboxes[1]), (bboxes[2]), (bboxes[3])
-    ## item() is used to retrieve the value from the tensor
-    distance = (2 * 3.14 * 180) / (w.item()+ h.item() * 360) * 1000 + 3 ### Distance measuring in Inch 
-    feedback = ("{}".format(labels["Current Object"])+ " " +"is"+" at {} ".format(round(distance))+"Inches")
-    # # speak.Speak(feedback)     # If you are running this on linux based OS kindly use espeak. Using this speaking library in winodws will add unnecessary latency 
-    print(feedback)
+    # ## Distance Meaasurement for each bounding box
+    # x, y, w, h = (bboxes[0]), (bboxes[1]), (bboxes[2]), (bboxes[3])
+    # ## item() is used to retrieve the value from the tensor
+    # distance = (2 * 3.14 * 180) / (w.item()+ h.item() * 360) * 1000 + 3 ### Distance measuring in Inch 
+    # feedback = ("{}".format(labels["Current Object"])+ " " +"is"+" at {} ".format(round(distance))+"Inches")
+    # # # speak.Speak(feedback)     # If you are running this on linux based OS kindly use espeak. Using this speaking library in winodws will add unnecessary latency 
+    # print(feedback)
     
     xx, yy, ww, hh =int(bboxes[0]), int(bboxes[1]), int(bboxes[2]), int(bboxes[3])
+    yy = round(yy-(0.2*(hh-yy)))
+    hh = round(hh+(0.2*(hh-yy)))
     
-    cv2.putText(img, str("{:.2f} Inches".format(distance)), (text_w+xx,yy), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0,255,0), font_thickness, cv2.LINE_AA)
-    cv2.rectangle(img, (xx, yy),(ww + text_w -30, hh), color, 2)
+    if (format(labels["Current Object"]) == "car"):
+        # cv2.putText(img, str("{:.2f} Inches".format(distance)), (text_w+xx,yy), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0,255,0), font_thickness, cv2.LINE_AA)
+        cv2.rectangle(img, (xx,yy),(ww, hh), color, 2)
     
-    cv2.putText(img, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-    cv2.imshow("frame", img)
+        cv2.putText(img, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
+        # prev_boxes.append([xx, yy, ww, hh])
+    # cv2.imshow("frame", img)
 
-    return img
+    return [xx, yy, ww, hh]
 
 class ObjectDetection:
     def __init__(self, id): 
-        # self.cap = cv2.VideoCapture(id)
-        self.cap = WebcamVideoStream(src = id).start()
+        self.cap = cv2.VideoCapture(id)
+        # self.cap = WebcamVideoStream(src = id).start()
         self.cfgfile = "cfg/yolov3.cfg"
         # self.cfgfile = 'cfg/yolov3-tiny.cfg'
         self.weightsfile = "yolov3.weights"
@@ -110,8 +115,8 @@ class ObjectDetection:
         q = queue.Queue()
         while True:
             def frame_render(queue_from_cam):
-                frame = self.cap.read() # If you capture stream using opencv (cv2.VideoCapture()) the use the following line
-                # ret, frame = self.cap.read()
+                # frame = self.cap.read() # If you capture stream using opencv (cv2.VideoCapture()) the use the following line
+                ret, frame = self.cap.read()
                 frame = cv2.resize(frame,(self.width, self.height))
                 queue_from_cam.put(frame)
             cam = threading.Thread(target=frame_render, args=(q,))
@@ -131,16 +136,17 @@ class ObjectDetection:
                 output = write_results(output, self.confidence, self.num_classes, nms = True, nms_conf = self.nms_thesh)  #### Localize the objects in a frame
                 output = output.type(torch.half)
                 
-                if list(output.size()) == [1,86]:
-                    print(output.size())
-                    pass
-                else:
-                    output[:,1:5] = torch.clamp(output[:,1:5], 0.0, float(self.inp_dim))/self.inp_dim
-                
-        #            im_dim = im_dim.repeat(output.size(0), 1)
-                    output[:,[1,3]] *= frame.shape[1]
-                    output[:,[2,4]] *= frame.shape[0]
-                    list(map(lambda boxes: write(boxes, frame, self.classes, self.colors),output))
+                for i in range(3):
+                    if list(output.size()) == [1,86]:
+                        print(output.size())
+                        break
+                    else:
+                        output[:,1:5] = torch.clamp(output[:,1:5], 0.0, float(self.inp_dim))/self.inp_dim
+
+        #                im_dim = im_dim.repeat(output.size(0), 1)
+                        output[:,[1,3]] *= frame.shape[1]
+                        output[:,[2,4]] *= frame.shape[0]
+                        list(map(lambda boxes: write(boxes, frame, self.classes, self.colors),output))
                     
             except:
                 pass
@@ -152,6 +158,7 @@ class ObjectDetection:
             cv2.imshow("Object Detection Window", frame)
              
             if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.destroyAllWindows()
                 break
             continue
             torch.cuda.empty_cache()
@@ -159,4 +166,4 @@ class ObjectDetection:
 
 if __name__ == "__main__":
     id = 0
-    ObjectDetection(id).main()
+    ObjectDetection("cctv_test.mp4").main()
