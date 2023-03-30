@@ -78,7 +78,7 @@ def write(bboxes, img, classes, colors):
         cv2.rectangle(img, (xx,yy),(ww, hh), color, 2)
     
         cv2.putText(img, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-        # prev_boxes.append([xx, yy, ww, hh])
+        prev_boxes.append([xx, yy, ww, hh])
     # cv2.imshow("frame", img)
 
     return [xx, yy, ww, hh]
@@ -125,31 +125,35 @@ class ObjectDetection:
             frame = q.get()
             q.task_done()
             fps = FPS().start() 
-            try:
-                img, orig_im, dim = prep_image(frame, self.inp_dim)
-                im_dim = torch.FloatTensor(dim).repeat(1,2)
-                if self.CUDA:                            #### If you have a gpu properly installed then it will run on the gpu
-                    im_dim = im_dim.cuda()
-                    img = img.cuda()
-                # with torch.no_grad():               #### Set the model in the evaluation mode
-                output = self.model(Variable(img), self.CUDA)
-                output = write_results(output, self.confidence, self.num_classes, nms = True, nms_conf = self.nms_thesh)  #### Localize the objects in a frame
-                output = output.type(torch.half)
-                
-                for i in range(3):
+            
+            for i in range(3):
+                try:
+                    img, orig_im, dim = prep_image(frame, self.inp_dim)
+                    im_dim = torch.FloatTensor(dim).repeat(1,2)
+                    if self.CUDA:                            #### If you have a gpu properly installed then it will run on the gpu
+                        im_dim = im_dim.cuda()
+                        img = img.cuda()
+                    # with torch.no_grad():               #### Set the model in the evaluation mode
+                    output = self.model(Variable(img), self.CUDA)
+                    output = write_results(output, self.confidence, self.num_classes, nms = True, nms_conf = self.nms_thesh)  #### Localize the objects in a frame
+                    output = output.type(torch.half)
+
+
                     if list(output.size()) == [1,86]:
                         print(output.size())
                         break
                     else:
                         output[:,1:5] = torch.clamp(output[:,1:5], 0.0, float(self.inp_dim))/self.inp_dim
-
-        #                im_dim = im_dim.repeat(output.size(0), 1)
                         output[:,[1,3]] *= frame.shape[1]
                         output[:,[2,4]] *= frame.shape[0]
                         list(map(lambda boxes: write(boxes, frame, self.classes, self.colors),output))
-                    
-            except:
-                pass
+                        [a, b, c, d] =prev_boxes[i]
+                        cv2.rectangle(frame, (a,b),(c, d), (0,0,0), 2)
+
+                except:
+                    pass
+            
+            prev_boxes.clear()
             
             fps.update()
             fps.stop()
