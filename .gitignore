@@ -1,3 +1,5 @@
 \object_detection\yolov3.weights
 ./object_detection/yolov3.weights
 object_detection/yolov3.weights
+./test.py
+./Output

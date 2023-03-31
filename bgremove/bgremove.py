@@ -1,16 +1,24 @@
 import cv2
 import numpy as np
-import time
+import os
+import shutil
+from PIL import Image
 
 def car_detect():
+    
+    if not os.path.exists("../Output"):
+        os.mkdir("../Output")
+    else:
+        shutil.rmtree("../Output")
+        os.mkdir("../Output")
+
 
     cap=cv2.VideoCapture(r'test.mp4')
-    car_locations = []
 
     min_width_react=90
     min_height_react=90
 
-    count_line_popsition=600
+    count_line_popsition=300
     algo=cv2.createBackgroundSubtractorMOG2(100,200)
 
     def centre_handle(x,y,w,h):
@@ -23,9 +31,7 @@ def car_detect():
     detect=[]
     offset=6
     counter=0
-    
-    try:
-        while True:
+    while True:
             ret,frame1=cap.read()
             grey=cv2.cvtColor(frame1,cv2.COLOR_BGR2GRAY)
             blur=cv2.GaussianBlur(grey,(3,3),5)
@@ -36,7 +42,7 @@ def car_detect():
             dilatada=cv2.morphologyEx(dilatada,cv2.MORPH_CLOSE,kernel)
             countershape,h=cv2.findContours(dilatada,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
-            cv2.line(frame1,(25,count_line_popsition),(1200,count_line_popsition),(255,127,0),3)
+            # cv2.line(frame1,(25,count_line_popsition),(1200,count_line_popsition),(255,127,0),3)
 
             for i,c in enumerate(countershape):
                 (x,y,w,h)=cv2.boundingRect(c)
@@ -45,15 +51,18 @@ def car_detect():
                     continue
                 
                 cv2.rectangle(frame1,(x,y),(x+w,y+h),(0,255,0),2)
+                xx, yy, ww, hh = x, y, w, h
 
                 center=centre_handle(x,y,w,h)
                 detect.append(center)
-                cv2.circle(frame1,center,4,(0,0,255))
+                # cv2.circle(frame1,center,4,(0,0,255))
                 for (x,y) in detect:
                     if y<(count_line_popsition+offset) and y>(count_line_popsition-offset):
                         counter+=1
-                        car_locations.append([x, y, w, h])
-                    cv2.line(frame1,(25,count_line_popsition),(1200,count_line_popsition),(0,127,255),3)
+                        save_img = frame1[yy:yy+hh, xx:xx+ww]
+                        saved = Image.fromarray(save_img)
+                        saved.save('../Output/{}.png'.format(counter))
+                    # cv2.line(frame1,(25,count_line_popsition),(1200,count_line_popsition),(0,127,255),3)
                     detect.remove((x,y))
                     print("Vehicle counter:"+str(counter))
                     
@@ -63,12 +72,8 @@ def car_detect():
             cv2.imshow('frame',frame1)
             if cv2.waitKey(1)==13:
                 break
-        cv2.destroyAllWindows()
-        cap.release()
-        
-    except:
-        print(car_locations)
-        return car_locations
+    cv2.destroyAllWindows()
+    cap.release()
     
 if __name__ == '__main__':
     car_detect()
