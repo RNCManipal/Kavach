@@ -3,10 +3,11 @@ import cv2
 import numpy as np
 import face_recognition
 import os
+import time
 
 
 #Constants
-filepath = "Test4.webm"
+filepath = "Test4.mp4"
 
 
 #input name:
@@ -47,6 +48,7 @@ encodeListKnown=findEncodings(images)
 
 #Web-Cam
 cap=cv2.VideoCapture(filepath)
+cap.set(cv2.CAP_PROP_FPS, int(90))
 
 #Main loop
 while True:
@@ -78,6 +80,7 @@ while True:
             print(name)
             if name == detect:
                 print("Suspect Found")
+                time.sleep(3)
                 cap.release()
                 cv2.destroyAllWindows()
                 exit()
@@ -100,5 +103,6 @@ while True:
 
 
 #releasing all cameras
+print("Suspect Not Found")
 cap.release()
 cv2.destroyAllWindows()
